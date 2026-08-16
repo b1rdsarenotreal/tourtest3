@@ -231,6 +231,18 @@ function el(tag, attrs, children){
 function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
+// Strips accents/diacritics so "Safarova" matches "Šafářová".
+function normalizeSearch(str){
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+function matchesSearch(name, query){
+  if(!query || !query.trim()) return true;
+  return normalizeSearch(name).includes(normalizeSearch(query));
+}
 
 /* ---------------- Scoreboard rendering ---------------- */
 function renderScoreboardHTML(match){
@@ -819,59 +831,127 @@ function renderBracketSeedsList(t){
   const list = $("#bracket-seeds-list");
   list.innerHTML = "";
   const nSeeds = numSeedsFor(t.drawSize);
-  const playersSorted = [...state.players].sort((a,b) => a.name.localeCompare(b.name));
   for(let i = 0; i < nSeeds; i++){
+    const assignedPlayer = t.seeds[i] ? playerById(t.seeds[i]) : null;
     const wrap = el("div", {class:"bracket-seed-slot"});
     wrap.appendChild(el("span", {class:"slot-num"}, ["#" + (i+1)]));
-    const sel = el("select", {"data-seed-rank": i});
-    sel.appendChild(el("option", {value:""}, ["— Unassigned —"]));
-    playersSorted.forEach(p => sel.appendChild(el("option", {value:p.id}, [p.name])));
-    sel.value = t.seeds[i] || "";
-    wrap.appendChild(sel);
+    const pickerWrap = el("div", {class:"picker-wrap"});
+    const input = el("input", {type:"text", class:"picker-input", "data-seed-rank": i, autocomplete:"off", placeholder:"Search player…"});
+    input.value = assignedPlayer ? assignedPlayer.name : "";
+    pickerWrap.appendChild(input);
+    if(assignedPlayer){
+      pickerWrap.appendChild(el("button", {type:"button", class:"picker-clear", "data-seed-clear-rank": i}, ["\u00d7"]));
+    }
+    pickerWrap.appendChild(el("div", {class:"picker-suggestions hidden", "data-seed-suggestions": i}));
+    wrap.appendChild(pickerWrap);
     list.appendChild(wrap);
   }
 }
 
-function handleSeedRankChange(e){
-  if(!e.target.matches("select[data-seed-rank]")) return;
+function handleSeedSearchInput(e){
+  if(!e.target.matches(".picker-input[data-seed-rank]")) return;
   const t = tournamentById(currentBracketTournamentId);
   if(!t) return;
-  const i = Number(e.target.dataset.seedRank);
-  t.seeds[i] = e.target.value || null;
-  saveState();
+  const rank = Number(e.target.dataset.seedRank);
+  const query = e.target.value;
+  const suggestionsEl = $('.picker-suggestions[data-seed-suggestions="' + rank + '"]');
+  if(!query.trim()){ suggestionsEl.classList.add("hidden"); suggestionsEl.innerHTML = ""; return; }
+  const usedElsewhere = new Set((t.seeds || []).filter((id, idx) => id && idx !== rank));
+  const results = state.players
+    .filter(p => !usedElsewhere.has(p.id))
+    .filter(p => matchesSearch(p.name, query))
+    .slice(0, 8);
+  suggestionsEl.innerHTML = results.length
+    ? results.map(p => '<button type="button" class="picker-option" data-seed-pick="' + rank + '" data-player-id="' + p.id + '">' + playerNameHTML(p) + '</button>').join("")
+    : '<div class="picker-empty">No match</div>';
+  suggestionsEl.classList.remove("hidden");
+}
+
+function handleSeedsListClick(e){
+  const t = tournamentById(currentBracketTournamentId);
+  if(!t) return;
+  const pickBtn = e.target.closest("[data-seed-pick]");
+  if(pickBtn){
+    const rank = Number(pickBtn.dataset.seedPick);
+    const pid = pickBtn.dataset.playerId;
+    t.seeds[rank] = pid;
+    t.unseededEntrants = (t.unseededEntrants || []).filter(id => id !== pid);
+    saveState();
+    renderBracketSeedsList(t);
+    renderBracketUnseededList(t);
+    return;
+  }
+  const clearBtn = e.target.closest("[data-seed-clear-rank]");
+  if(clearBtn){
+    const rank = Number(clearBtn.dataset.seedClearRank);
+    t.seeds[rank] = null;
+    saveState();
+    renderBracketSeedsList(t);
+    renderBracketUnseededList(t);
+  }
 }
 
 function renderBracketUnseededList(t){
-  const list = $("#bracket-unseeded-list");
-  list.innerHTML = "";
-  const seededIds = new Set((t.seeds || []).filter(Boolean));
-  const eligible = [...state.players]
-    .filter(p => !seededIds.has(p.id))
-    .sort((a,b) => a.name.localeCompare(b.name));
-  if(eligible.length === 0){
-    list.appendChild(el("p", {}, ["No unseeded players available — add more players, or free some up from the Seeds list above."]));
-    return;
+  const container = $("#bracket-unseeded-list");
+  container.innerHTML = "";
+  const pickerWrap = el("div", {class:"picker-wrap"});
+  pickerWrap.appendChild(el("input", {type:"text", class:"picker-input", "data-entrant-search":"1", autocomplete:"off", placeholder:"Search player to add…"}));
+  pickerWrap.appendChild(el("div", {class:"picker-suggestions hidden", "data-entrant-suggestions":"1"}));
+  container.appendChild(pickerWrap);
+
+  const chipsWrap = el("div", {class:"entrant-chips"});
+  const entrants = (t.unseededEntrants || []).map(id => playerById(id)).filter(Boolean).sort((a,b) => a.name.localeCompare(b.name));
+  if(entrants.length === 0){
+    chipsWrap.appendChild(el("p", {class:"picker-empty-note"}, ["No unseeded entrants added yet — search above to add them."]));
+  } else {
+    entrants.forEach(p => {
+      const chip = el("span", {class:"entrant-chip", html: playerNameHTML(p)});
+      chip.appendChild(el("button", {type:"button", class:"entrant-chip-remove", "data-entrant-remove": p.id}, ["\u00d7"]));
+      chipsWrap.appendChild(chip);
+    });
   }
-  const selectedSet = new Set(t.unseededEntrants || []);
-  eligible.forEach(p => {
-    const label = el("label", {class:"entrant-check"});
-    const cb = el("input", {type:"checkbox", "data-entrant-id": p.id});
-    if(selectedSet.has(p.id)) cb.checked = true;
-    label.appendChild(cb);
-    label.appendChild(el("span", {html: playerNameHTML(p)}));
-    list.appendChild(label);
-  });
+  container.appendChild(chipsWrap);
 }
 
-function handleEntrantCheck(e){
-  if(!e.target.matches("input[data-entrant-id]")) return;
+function handleEntrantSearchInput(e){
+  if(!e.target.matches("[data-entrant-search]")) return;
   const t = tournamentById(currentBracketTournamentId);
   if(!t) return;
-  const id = e.target.dataset.entrantId;
-  const set = new Set(t.unseededEntrants || []);
-  if(e.target.checked) set.add(id); else set.delete(id);
-  t.unseededEntrants = Array.from(set);
-  saveState();
+  const query = e.target.value;
+  const suggestionsEl = $('[data-entrant-suggestions]');
+  if(!query.trim()){ suggestionsEl.classList.add("hidden"); suggestionsEl.innerHTML = ""; return; }
+  const seededIds = new Set((t.seeds || []).filter(Boolean));
+  const existingIds = new Set(t.unseededEntrants || []);
+  const results = state.players
+    .filter(p => !seededIds.has(p.id) && !existingIds.has(p.id))
+    .filter(p => matchesSearch(p.name, query))
+    .slice(0, 8);
+  suggestionsEl.innerHTML = results.length
+    ? results.map(p => '<button type="button" class="picker-option" data-entrant-pick="' + p.id + '">' + playerNameHTML(p) + '</button>').join("")
+    : '<div class="picker-empty">No match</div>';
+  suggestionsEl.classList.remove("hidden");
+}
+
+function handleUnseededListClick(e){
+  const t = tournamentById(currentBracketTournamentId);
+  if(!t) return;
+  const pickBtn = e.target.closest("[data-entrant-pick]");
+  if(pickBtn){
+    const pid = pickBtn.dataset.entrantPick;
+    const set = new Set(t.unseededEntrants || []);
+    set.add(pid);
+    t.unseededEntrants = Array.from(set);
+    saveState();
+    renderBracketUnseededList(t);
+    return;
+  }
+  const rmBtn = e.target.closest("[data-entrant-remove]");
+  if(rmBtn){
+    const pid = rmBtn.dataset.entrantRemove;
+    t.unseededEntrants = (t.unseededEntrants || []).filter(id => id !== pid);
+    saveState();
+    renderBracketUnseededList(t);
+  }
 }
 
 function handleGenerateDraw(){
@@ -1003,12 +1083,16 @@ function buildSlotRow(slot, m, which){
 
 function buildBracketMatchCard(t, m){
   const card = el("div", {class:"bracket-match status-" + m.status});
-  card.appendChild(buildSlotRow(m.slotA, m, "A"));
-  card.appendChild(buildSlotRow(m.slotB, m, "B"));
-
+  const body = el("div", {class:"bracket-match-body"});
+  const names = el("div", {class:"bracket-match-names"}, [
+    buildSlotRow(m.slotA, m, "A"),
+    buildSlotRow(m.slotB, m, "B")
+  ]);
+  body.appendChild(names);
   if(m.status === "played" && m.existingMatch){
-    card.appendChild(el("div", {class:"bracket-match-score", html: renderScoreboardHTML(m.existingMatch)}));
+    body.appendChild(el("div", {class:"bracket-match-score", html: renderScoreboardHTML(m.existingMatch)}));
   }
+  card.appendChild(body);
 
   if(m.status === "ready"){
     if(bracketEditing && bracketEditing.round === m.round && bracketEditing.slot === m.slotIndex){
@@ -1468,9 +1552,16 @@ document.addEventListener("DOMContentLoaded", () => {
   $("#bracket-back").addEventListener("click", closeBracket);
   $("#bracket-toggle-seed").addEventListener("click", () => $("#bracket-seed-grid").classList.toggle("hidden"));
   $("#bracket-seed-grid").addEventListener("change", handleSeedSelectChange);
-  $("#bracket-seeds-list").addEventListener("change", handleSeedRankChange);
-  $("#bracket-unseeded-list").addEventListener("change", handleEntrantCheck);
+  $("#bracket-seeds-list").addEventListener("input", handleSeedSearchInput);
+  $("#bracket-seeds-list").addEventListener("click", handleSeedsListClick);
+  $("#bracket-unseeded-list").addEventListener("input", handleEntrantSearchInput);
+  $("#bracket-unseeded-list").addEventListener("click", handleUnseededListClick);
   $("#bracket-generate-draw").addEventListener("click", handleGenerateDraw);
+  document.addEventListener("click", (e) => {
+    if(!e.target.closest(".picker-wrap")){
+      $all(".picker-suggestions").forEach(s => s.classList.add("hidden"));
+    }
+  });
 
   $("#match-form").addEventListener("submit", handleMatchSubmit);
   $("#mf-playerA").addEventListener("change", updateWinnerOptions);

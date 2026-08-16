@@ -303,6 +303,10 @@ form input[type=text], form input[type=number], form select{
   background: white;
   color: var(--ink);
 }
+/* Hide the up/down stepper controls on number inputs everywhere — cleaner for score entry. */
+input[type=number]{ -moz-appearance: textfield; appearance: textfield; }
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{ -webkit-appearance: none; margin: 0; }
 .field-row{display:flex; gap: 16px;}
 .walkover-check{
   flex-direction: row !important;
@@ -369,24 +373,53 @@ form textarea{
   min-height: 24px;
 }
 .flag{margin-right: 5px;}
-.bracket-entrant-grid{
-  display:grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 6px;
-  margin-top: 12px;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 8px;
+
+/* Search-to-add player picker, used for bracket seeds and unseeded entrants */
+.picker-wrap{position:relative; flex:1; min-width:0;}
+.picker-input{
+  width:100%;
+  font-family:'Inter', sans-serif;
+  font-size: 13px;
+  padding: 7px 28px 7px 9px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: white;
+  color: var(--ink);
 }
-.entrant-check{
-  display:flex; align-items:center; gap:6px;
-  font-size: 13px;
-  padding: 4px 6px;
+.picker-clear{
+  position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  background:none; border:none; color: var(--ink-soft);
+  font-size: 16px; line-height:1; cursor:pointer; padding:2px 6px;
 }
-.entrant-check input{width:15px; height:15px; flex-shrink:0;}
+.picker-clear:hover{color: var(--clay);}
+.picker-suggestions{
+  position:absolute; top:100%; left:0; right:0; z-index:20;
+  background:white; border:1px solid var(--ink); border-radius: var(--radius);
+  margin-top:3px; max-height:220px; overflow-y:auto;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.14);
+}
+.picker-option{
+  display:block; width:100%; text-align:left;
+  background:none; border:none; border-bottom:1px solid var(--paper-2);
+  padding: 8px 10px; font-family:'Inter', sans-serif; font-size: 13px; cursor:pointer; color: var(--ink);
+}
+.picker-option:last-child{border-bottom:none;}
+.picker-option:hover{background: var(--paper-2);}
+.picker-empty{padding: 8px 10px; font-size: 12px; color: var(--ink-soft); font-family:'JetBrains Mono', monospace;}
+.picker-empty-note{font-size: 13px; color: var(--ink-soft); margin: 8px 0 0;}
+
+.entrant-chips{display:flex; flex-wrap:wrap; gap:8px; margin-top: 14px;}
+.entrant-chip{
+  display:inline-flex; align-items:center; gap:7px;
+  background:white; border:1px solid var(--line); border-radius: 20px;
+  padding: 5px 6px 5px 12px; font-size: 13px;
+}
+.entrant-chip-remove{
+  background: var(--paper-2); border:none; border-radius:50%;
+  width:18px; height:18px; line-height:1; cursor:pointer; color: var(--ink-soft); font-size: 13px;
+}
+.entrant-chip-remove:hover{background: var(--clay); color:white;}
+
 .rank-move{
   font-family:'JetBrains Mono', monospace;
   font-size: 11px;
@@ -606,11 +639,21 @@ form textarea{
   font-size: 13px;
 }
 .bracket-match.status-played{border-color: var(--ink);}
+.bracket-match-body{
+  display:flex;
+  align-items:stretch;
+}
+.bracket-match-names{
+  flex: 1;
+  min-width: 0;
+}
 .bracket-match-score{
   display:flex;
+  align-items:center;
   justify-content:center;
-  padding: 5px 0 6px;
-  border-top: 1px dashed var(--line);
+  padding: 0 8px;
+  border-left: 1px dashed var(--line);
+  flex-shrink: 0;
 }
 .bracket-match-score .scoreboard{font-size: 11px;}
 .bracket-match-score .sb-set{padding: 2px 6px;}
