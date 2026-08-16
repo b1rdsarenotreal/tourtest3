@@ -934,16 +934,53 @@ function handleSeedSelectChange(e){
   renderRankings();
 }
 
+// Vertical rhythm: every round-0 match occupies one row of this height.
+// Later rounds are centered exactly on the midpoint of their two feeder
+// matches (computed recursively), so columns line up cleanly instead of
+// drifting the way flexbox auto-distribution does once card heights vary.
+const BRACKET_ROW_H = 108;
+const BRACKET_TITLE_OFFSET = 32;
+const BRACKET_CARD_H = 78;
+
 function renderBracketRounds(t){
   const wrap = $("#bracket-wrap");
   wrap.innerHTML = "";
   const rounds = computeBracket(t);
-  const baseHeight = Math.max(rounds[0].matches.length, 1) * 112;
-  rounds.forEach(roundObj => {
+  const round0Count = Math.max(rounds[0].matches.length, 1);
+  const colHeight = round0Count * BRACKET_ROW_H + BRACKET_TITLE_OFFSET;
+
+  const centersByRound = [];
+  for(let i = 0; i < round0Count; i++){
+    centersByRound.push([]);
+  }
+  const round0Centers = [];
+  for(let i = 0; i < round0Count; i++) round0Centers.push(i * BRACKET_ROW_H + BRACKET_ROW_H / 2);
+  const centers = [round0Centers];
+  for(let r = 1; r < rounds.length; r++){
+    const prev = centers[r-1];
+    const cur = [];
+    for(let i = 0; i < prev.length / 2; i++){
+      cur.push((prev[i*2] + prev[i*2+1]) / 2);
+    }
+    centers.push(cur);
+  }
+
+  rounds.forEach((roundObj, r) => {
     const col = el("div", {class:"bracket-round"});
-    col.style.height = baseHeight + "px";
+    col.style.height = colHeight + "px";
     col.appendChild(el("div", {class:"bracket-round-title"}, [ROUND_LABELS[roundObj.round] || roundObj.round]));
-    roundObj.matches.forEach(m => col.appendChild(buildBracketMatchCard(t, m)));
+    roundObj.matches.forEach((m, i) => {
+      const card = buildBracketMatchCard(t, m);
+      const isEditing = bracketEditing && bracketEditing.round === m.round && bracketEditing.slot === m.slotIndex;
+      const centerY = centers[r][i];
+      card.style.position = "absolute";
+      card.style.top = (BRACKET_TITLE_OFFSET + centerY - BRACKET_CARD_H / 2) + "px";
+      card.style.left = "0";
+      card.style.right = "0";
+      card.style.margin = "0";
+      card.style.zIndex = isEditing ? "5" : "1";
+      col.appendChild(card);
+    });
     wrap.appendChild(col);
   });
 }
@@ -961,10 +998,6 @@ function buildSlotRow(slot, m, which){
   const isWinner = m.status !== "ready" && m.winnerSlot && slot.type === "player" && m.winnerSlot.playerId === slot.playerId;
   const row = el("div", {class: "bracket-slot" + (isWinner ? " slot-winner" : "") + extraClass});
   row.appendChild(el("span", {class:"slot-name", html: nameHTML}));
-  if(which === "A" && m.status === "played" && m.existingMatch){
-    const scoreText = m.existingMatch.walkover ? "W/O" : (m.existingMatch.sets || []).map(s => s.a + "-" + s.b).join(", ");
-    row.appendChild(el("span", {class:"slot-score"}, [scoreText]));
-  }
   return row;
 }
 
@@ -972,6 +1005,10 @@ function buildBracketMatchCard(t, m){
   const card = el("div", {class:"bracket-match status-" + m.status});
   card.appendChild(buildSlotRow(m.slotA, m, "A"));
   card.appendChild(buildSlotRow(m.slotB, m, "B"));
+
+  if(m.status === "played" && m.existingMatch){
+    card.appendChild(el("div", {class:"bracket-match-score", html: renderScoreboardHTML(m.existingMatch)}));
+  }
 
   if(m.status === "ready"){
     if(bracketEditing && bracketEditing.round === m.round && bracketEditing.slot === m.slotIndex){

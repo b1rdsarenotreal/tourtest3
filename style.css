@@ -25,7 +25,7 @@ body{
   -webkit-font-smoothing: antialiased;
 }
 .hidden{display:none !important;}
-.wrap{max-width: 1080px; margin: 0 auto; padding: 0 24px;}
+.wrap{max-width: none; margin: 0; padding: 0 32px;}
 
 h1,h2,h3{
   font-family:'Oswald', sans-serif;
@@ -581,15 +581,13 @@ form textarea{
 
 .bracket-wrap{
   display:flex;
-  gap: 30px;
+  gap: 22px;
   overflow-x: auto;
   padding-bottom: 24px;
 }
 .bracket-round{
-  display:flex;
-  flex-direction: column;
-  justify-content: space-around;
-  min-width: 230px;
+  position: relative;
+  width: 230px;
   flex-shrink: 0;
 }
 .bracket-round-title{
@@ -605,10 +603,17 @@ form textarea{
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: white;
-  margin: 6px 0;
   font-size: 13px;
 }
 .bracket-match.status-played{border-color: var(--ink);}
+.bracket-match-score{
+  display:flex;
+  justify-content:center;
+  padding: 5px 0 6px;
+  border-top: 1px dashed var(--line);
+}
+.bracket-match-score .scoreboard{font-size: 11px;}
+.bracket-match-score .sb-set{padding: 2px 6px;}
 .bracket-slot{
   display:flex; align-items:center; justify-content:space-between;
   gap: 8px;
@@ -620,12 +625,6 @@ form textarea{
 .bracket-slot.slot-empty .slot-name{color: var(--ink-soft); font-style: italic;}
 .bracket-slot.slot-bye .slot-name{color: var(--ink-soft); font-family:'JetBrains Mono', monospace; font-size:11px; text-transform:uppercase;}
 .bracket-slot.slot-winner{background: var(--paper-2); font-weight: 700;}
-.bracket-slot .slot-score{
-  font-family:'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--ink-soft);
-  flex-shrink: 0;
-}
 .bracket-match-actions{padding: 6px 10px; border-top: 1px dashed var(--line); display:flex; justify-content: space-between; align-items:center;}
 .bracket-match-actions .btn{width:100%;}
 .bracket-match-form{padding: 10px; border-top: 1px dashed var(--line);}
