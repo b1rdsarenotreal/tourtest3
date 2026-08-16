@@ -818,6 +818,20 @@ function renderBracketPage(){
   });
   sizeLabel.appendChild(sizeSelect);
   controls.appendChild(sizeLabel);
+
+  const clearBtn = el("button", {class:"btn btn-small btn-danger"}, ["Clear All Results"]);
+  clearBtn.addEventListener("click", () => {
+    const count = matchesForTournament(t.id).length;
+    if(count === 0) return;
+    if(confirm("Clear all " + count + " recorded result" + (count===1?"":"s") + " for " + t.name + "? The seeded draw stays intact — you can re-enter results from scratch. This can't be undone.")){
+      state.matches = state.matches.filter(m => m.tournamentId !== t.id);
+      saveState();
+      bracketEditing = null;
+      renderBracketRounds(t);
+      renderRankings();
+    }
+  });
+  controls.appendChild(clearBtn);
   head.appendChild(controls);
 
   $("#bracket-numseeds-label").textContent = numSeedsFor(t.drawSize);
@@ -1590,6 +1604,15 @@ document.addEventListener("DOMContentLoaded", () => {
         renderHistory();
         renderRankings();
       }
+    }
+  });
+
+  $("#reset-all-data").addEventListener("click", () => {
+    const summary = state.players.length + " players, " + state.tournaments.length +
+      " tournaments, and " + state.matches.length + " results";
+    if(confirm("This permanently deletes everything — " + summary + ". This can't be undone. Continue?")){
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
     }
   });
 

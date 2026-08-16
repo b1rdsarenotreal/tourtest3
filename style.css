@@ -685,6 +685,22 @@ form textarea{
 .bracket-winner-row{display:flex; gap:6px;}
 .bracket-winner-row .btn{flex:1; font-size:11px; padding:6px 4px;}
 
+/* ---------------- Footer ---------------- */
+.site-footer{
+  border-top: 1px solid var(--line);
+  margin-top: 40px;
+  padding: 20px 0 40px;
+}
+.footer-row{
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.footer-note{
+  font-family:'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
 @media (max-width: 640px){
   .profile-stats{grid-template-columns: repeat(3,1fr);}
   .field-row{flex-direction: column; gap:0;}
